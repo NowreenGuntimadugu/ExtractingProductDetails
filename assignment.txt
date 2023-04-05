@@ -1,0 +1,77 @@
+package practice;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class Extract {
+
+    public static void main(String[] args) {
+        String url = "https://www.staples.com/Computer-office-desks/cat_CL210795/663ea?icid=BTS:2020:STUDYSPACE:DESKS";
+        String csvFileName = "top10products.csv";
+        List<String[]> products = getTop10Products(url);
+        exportToCsv(products, csvFileName);
+    }
+
+    private static List<String[]> getTop10Products(String urlStr) {
+        List<String[]> products = new ArrayList<>();
+
+        try {
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                Scanner scanner = new Scanner(conn.getInputStream());
+                String responseBody = scanner.useDelimiter("\\A").next();
+                scanner.close();
+
+                Pattern pattern = Pattern.compile("<div class=\"product-details\">(.*?)</div>", Pattern.DOTALL);
+                Matcher matcher = pattern.matcher(responseBody);
+
+                while (matcher.find()) {
+                    String productDetails = matcher.group(1);
+                    String[] detailsArray = productDetails.split("<br/>");
+                    String[] product = new String[4];
+                    product[0] = detailsArray[0].trim(); // Product name
+                    product[1] = detailsArray[1].trim(); // Product model
+                    product[2] = detailsArray[2].trim(); // Product price
+                    product[3] = detailsArray[3].trim(); // Product rating
+                    products.add(product);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Sort products by rating
+        Collections.sort(products, (p1, p2) -> Double.compare(Double.parseDouble(p2[3]), Double.parseDouble(p1[3])));
+
+        // Return top 10 products or all products if the list is smaller than 10
+        int numProducts = Math.min(10, products.size());
+        return products.subList(0, numProducts);
+    }
+
+    private static void exportToCsv(List<String[]> data, String fileName) {
+        try {
+            FileWriter csvWriter = new FileWriter(fileName);
+            csvWriter.append("Product Name,Product Model,Product Price,Product Rating\n");
+            for (String[] product : data) {
+                csvWriter.append(String.join(",", product)).append("\n");
+            }
+            csvWriter.flush();
+            csvWriter.close();
+            System.out.println("Data exported to " + fileName);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
